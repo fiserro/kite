@@ -57,8 +57,32 @@ public final class ReadProtobufBuilder implements CommandBuilder {
   private static final class ReadProtobuf extends AbstractParser {
 
     private static final String PARSE_FROM = "parseFrom";
+
+    private static Class<?> getInnerClass(Class<?> declaringClass, String classNamePath) {
+      String className;
+      int nextPos = classNamePath.indexOf('.');
+      if (nextPos < 0) {
+        className = classNamePath;
+        classNamePath = null;
+      } else {
+        className = classNamePath.substring(0, nextPos);
+        classNamePath = classNamePath.substring(nextPos + 1);
+      }
+      Class<?> innerClass = null;
+      for (Class<?> class1 : declaringClass.getDeclaredClasses()) {
+        if (class1.getSimpleName().equals(className)) {
+          innerClass = class1;
+        }
+      }
+      if (innerClass != null && classNamePath != null) {
+        innerClass = getInnerClass(innerClass, classNamePath);
+      }
+      return innerClass;
+    }
+
     private final Class<?> outputClass;
     private final Class<?> protobufClass;
+
     private final Method parseMethod;
 
     public ReadProtobuf(CommandBuilder builder, Config config, Command parent, Command child, MorphlineContext context) {
@@ -81,8 +105,8 @@ public final class ReadProtobufBuilder implements CommandBuilder {
       try {
         parseMethod = outputClass.getMethod(PARSE_FROM, InputStream.class);
       } catch (NoSuchMethodException e) {
-        throw new MorphlineCompilationException("Method '" + PARSE_FROM + "' does not exist in class '" + outputClassName
-            + "'.", config, e);
+        throw new MorphlineCompilationException("Method '" + PARSE_FROM + "' does not exist in class '"
+            + outputClassName + "'.", config, e);
       } catch (SecurityException e) {
         throw new MorphlineCompilationException("Method '" + PARSE_FROM + "' is probably not public in class '"
             + outputClassName + "'.", config, e);
@@ -116,16 +140,6 @@ public final class ReadProtobufBuilder implements CommandBuilder {
       }
 
       return true;
-    }
-
-    private Class<?> getInnerClass(Class<?> declaringClass, String innerClassName) {
-      Class<?> innerClass = null;
-      for (Class<?> class1 : protobufClass.getDeclaredClasses()) {
-        if (class1.getSimpleName().equals(innerClassName)) {
-          innerClass = class1;
-        }
-      }
-      return innerClass;
     }
   }
 }
