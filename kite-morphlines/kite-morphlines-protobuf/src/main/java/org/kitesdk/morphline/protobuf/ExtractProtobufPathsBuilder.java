@@ -17,11 +17,13 @@ package org.kitesdk.morphline.protobuf;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +43,9 @@ import org.kitesdk.morphline.base.Validator;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Message;
 import com.typesafe.config.Config;
 
 /**
@@ -176,6 +181,35 @@ public final class ExtractProtobufPathsBuilder implements CommandBuilder {
       return getChild().process(outputRecord);
     }
 
+    private Map<String, Object> extractMap(Message datum) {
+
+      Map<String, Object> map = new LinkedHashMap<String, Object>();
+
+      Descriptor desc = datum.getDescriptorForType();
+      List<FieldDescriptor> fields = desc.getFields();
+      for (FieldDescriptor fieldDesc : fields) {
+        Object field = datum.getField(fieldDesc);
+        if (fieldDesc.isRepeated()) {
+          List<Object> list = new ArrayList<Object>();
+          for (Object object : (List<Object>) field) {
+            if (object instanceof Message) {
+              list.add(extractMap((Message) object));
+            } else {
+              list.add(object);
+            }
+          }
+          map.put(fieldDesc.getName(), list);
+        } else if (datum.hasField(fieldDesc)) {
+          if (field instanceof Message) {
+            map.put(fieldDesc.getName(), extractMap((Message) field));
+          } else {
+            map.put(fieldDesc.getName(), field);
+          }
+        }
+      }
+      return map;
+    }
+
     private void extractPath(Object datum, String fieldName, List<String> steps, Record record, int level)
         throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
         InvocationTargetException {
@@ -215,8 +249,10 @@ public final class ExtractProtobufPathsBuilder implements CommandBuilder {
 
       if (isEnum && enumExtractMethod == EnumExtractMethods.none) {
         return datum;
-      } else if (objectExtractMethod == ObjectExtractMethods.none) {
+      } else if (!isEnum && objectExtractMethod == ObjectExtractMethods.none) {
         return datum;
+      } else if (!isEnum && objectExtractMethod == ObjectExtractMethods.toMap) {
+        return extractMap((Message) datum);
       }
 
       Map<Class<?>, Method> extractMethods;
@@ -335,7 +371,7 @@ public final class ExtractProtobufPathsBuilder implements CommandBuilder {
     }
 
     private static enum ObjectExtractMethods {
-      toByteArray, toString, none
+      toByteArray, toString, toMap, none
     }
   }
 

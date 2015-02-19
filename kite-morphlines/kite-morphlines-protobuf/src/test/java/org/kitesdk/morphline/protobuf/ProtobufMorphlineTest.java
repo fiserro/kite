@@ -19,7 +19,9 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -39,8 +41,11 @@ public class ProtobufMorphlineTest extends AbstractMorphlineTest {
   private static Complex complex;
 
   private static byte[] nameBytes;
-  private static byte[] link1Bytes;
-  private static byte[] link2Bytes;
+  private static byte[] linkBytes1;
+  private static byte[] linkBytes2;
+
+  private static Map<String, Object> linkMap1;
+  private static Map<String, Object> linkMap2;
 
   @BeforeClass
   public static void prepareInputExtractProtoPaths() {
@@ -62,8 +67,14 @@ public class ProtobufMorphlineTest extends AbstractMorphlineTest {
     complex = complexBuilder.build();
 
     nameBytes = name.toByteArray();
-    link1Bytes = link1.toByteArray();
-    link2Bytes = link2.toByteArray();
+    linkBytes1 = link1.toByteArray();
+    linkBytes2 = link2.toByteArray();
+    linkMap1 = new LinkedHashMap<String, Object>();
+    linkMap1.put("language", Arrays.asList("CZ", "EN-US"));
+    linkMap1.put("url", "http://google.com");
+    linkMap2 = new LinkedHashMap<String, Object>();
+    linkMap2.put("language", Arrays.asList("RU"));
+    linkMap2.put("url", "https://vk.com/");
   }
 
   @BeforeClass
@@ -88,6 +99,13 @@ public class ProtobufMorphlineTest extends AbstractMorphlineTest {
 
     Record firstRecord = collector.getFirstRecord();
     assertEquals(Arrays.asList(complex.getDocId()), firstRecord.get("docId"));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> name = (Map<String, Object>) firstRecord.getFirstValue("nameMap");
+    assertEquals(complex.getName().getStringValList(), name.get("stringVal"));
+    assertEquals(complex.getName().getIntVal(), name.get("intVal"));
+    assertEquals(complex.getName().getFloatVal(), name.get("floatVal"));
+    assertEquals(null, name.get("doubleVal"));
+    assertEquals(complex.getName().getLongVal(), name.get("longVal"));
     assertArrayEquals(nameBytes, (byte[]) firstRecord.getFirstValue("name"));
     assertEquals(Arrays.asList(complex.getName().getIntVal()), firstRecord.get("intVal"));
     assertEquals(Arrays.asList(complex.getName().getLongVal()), firstRecord.get("longVal"));
@@ -95,8 +113,10 @@ public class ProtobufMorphlineTest extends AbstractMorphlineTest {
     assertEquals(Arrays.asList(complex.getName().getFloatVal()), firstRecord.get("floatVal"));
     assertEquals(complex.getName().getStringValList(), firstRecord.get("stringVals"));
     assertEquals(LIST_OF_LONGS, firstRecord.get("longVals"));
-    assertArrayEquals(link1Bytes, (byte[]) firstRecord.get("links").get(0));
-    assertArrayEquals(link2Bytes, (byte[]) firstRecord.get("links").get(1));
+    assertArrayEquals(linkBytes1, (byte[]) firstRecord.get("links").get(0));
+    assertArrayEquals(linkBytes2, (byte[]) firstRecord.get("links").get(1));
+    assertEquals(linkMap1, firstRecord.get("linksMap").get(0));
+    assertEquals(linkMap2, firstRecord.get("linksMap").get(1));
     assertEquals(Arrays.asList("CZ", "EN-US", "RU"), firstRecord.get("languages"));
     assertEquals(Arrays.asList("http://google.com", "https://vk.com/"), firstRecord.get("urls"));
     assertEquals(Arrays.asList(Type.UPDATE.name()), firstRecord.get("type"));
